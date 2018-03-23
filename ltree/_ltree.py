@@ -2,6 +2,8 @@ import re
 from functools import total_ordering
 from collections import Sequence
 
+import six
+
 re_ltree = re.compile(r'^[a-zA-Z0-9_]+$')
 
 
@@ -14,7 +16,7 @@ class Ltree(tuple):
         def _label(s):
             if s is None or s == '':
                 return None
-            if isinstance(s, basestring):
+            if isinstance(s, six.string_types):
                 if re_ltree.match(s):
                     return s
                 else:
@@ -25,7 +27,7 @@ class Ltree(tuple):
         labels = []
 
         for arg in args:
-            if isinstance(arg, basestring):
+            if isinstance(arg, six.string_types):
                 labels += map(_label, arg.split('.'))
             elif isinstance(arg, Sequence):
                 labels += map(_label, arg)
@@ -37,7 +39,7 @@ class Ltree(tuple):
     def __eq__(self, other):
         if isinstance(other, Ltree):
             return tuple.__eq__(self, other)
-        elif isinstance(other, basestring):
+        elif isinstance(other, six.string_types):
             return str(self) == other
         else:
             return self.__eq__(Ltree(other))
@@ -45,7 +47,7 @@ class Ltree(tuple):
     def __lt__(self, other):
         if isinstance(other, Ltree):
             return tuple.__lt__(self, other)
-        elif isinstance(other, basestring):
+        elif isinstance(other, six.string_types):
             return str(self) < other
         else:
             return self.__lt__(Ltree(other))

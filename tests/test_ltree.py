@@ -170,4 +170,4 @@ class TestAdapt:
         import ltree.pg
         ltree.pg.register_adapter()
         import psycopg2.extensions as ext
-        assert ext.adapt(Ltree('foo.bar.baz')).getquoted() == "'foo.bar.baz'"
+        assert ext.adapt(Ltree('foo.bar.baz')).getquoted() == b"'foo.bar.baz'"

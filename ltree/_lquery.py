@@ -1,6 +1,8 @@
 import re
 from collections import Sequence, namedtuple
 
+import six
+
 re_lquery = re.compile(r'^[a-zA-Z0-9_\|]+$')
 
 
@@ -66,7 +68,7 @@ class Lquery(tuple):
         def _label(s):
             if s is None or s == '':
                 return None
-            if isinstance(s, basestring):
+            if isinstance(s, six.string_types):
                 if re_lquery.match(s):
                     return s
 
@@ -81,7 +83,7 @@ class Lquery(tuple):
         labels = []
 
         for arg in args:
-            if isinstance(arg, basestring):
+            if isinstance(arg, six.string_types):
                 labels += map(_label, arg.split('.'))
             elif isinstance(arg, Sequence):
                 labels += map(_label, arg)
@@ -109,7 +111,7 @@ class Lquery(tuple):
     def __eq__(self, other):
         if isinstance(other, Lquery):
             return tuple.__eq__(self, other)
-        elif isinstance(other, basestring):
+        elif isinstance(other, six.string_types):
             return str(self) == other
         else:
             return self.__eq__(Lquery(other))

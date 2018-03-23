@@ -8,7 +8,7 @@ from ._lquery import Lquery
 
 
 def register_adapter():
-    """Retigster the ltree adapters globally.
+    """Register the ltree adapters globally.
     """
     ext.register_adapter(Ltree, adapt_ltree)
     ext.register_adapter(Lquery, adapt_ltree)
@@ -73,10 +73,10 @@ def get_oids(conn_or_curs, type_name):
 
     # get the oid for the ltree
     curs.execute("""\
-        select t.oid, typarray
-        from pg_type t join pg_namespace ns
-            on typnamespace = ns.oid
-        where typname = %s
+        SELECT t.oid, typarray
+        FROM pg_type t
+          JOIN pg_namespace ns ON typnamespace = ns.oid
+        WHERE typname = %s
         """, (type_name,))
 
     for oids in curs:
@@ -84,7 +84,7 @@ def get_oids(conn_or_curs, type_name):
         rv1.append(oids[1])
 
     # revert the status of the connection as before the command
-    if (conn_status != ext.STATUS_IN_TRANSACTION and not conn.autocommit):
+    if conn_status != ext.STATUS_IN_TRANSACTION and not conn.autocommit:
         conn.rollback()
 
     return tuple(rv0), tuple(rv1)
