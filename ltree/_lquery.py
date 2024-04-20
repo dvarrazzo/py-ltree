@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import re
+from typing import Any
 from collections import namedtuple
 from collections.abc import Sequence
 
@@ -6,7 +9,7 @@ re_lquery = re.compile(r"^[a-zA-Z0-9_\|]+$")
 
 
 class Star(namedtuple("Star", "min max")):
-    def __new__(cls, min=None, max=None):
+    def __new__(cls, min: int | None = None, max: int | None = None):
         min = None if not min else int(min)
         max = None if not max else int(max)
         self = super(Star, cls).__new__(cls, min, max)
@@ -23,7 +26,7 @@ class Star(namedtuple("Star", "min max")):
     )
 
     @classmethod
-    def parse(cls, s):
+    def parse(cls, s: str) -> Star | None:
         m = cls.re_star.match(s)
         if m is None:
             return None
@@ -33,19 +36,19 @@ class Star(namedtuple("Star", "min max")):
         elif m.group(2):
             min = max = int(m.group(2))
         else:
-            min = m.group(3)
-            min = int(min) if min else None
-            max = m.group(4)
-            max = int(max) if max else None
+            v = m.group(3)
+            min = int(v) if v else None
+            v = m.group(4)
+            max = int(v) if v else None
 
         return cls(min, max)
 
-    def merge(self, other):
+    def merge(self, other: Star) -> Star:
         min = ((self.min or 0) + (other.min or 0)) or None
         max = None if (self.max is None or other.max is None) else self.max + other.max
         return Star(min, max)
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.min is None and self.max is None:
             return "*"
         if self.min is not None and self.max is not None:
@@ -66,7 +69,7 @@ class Lquery(tuple):
 
     __slots__ = ()
 
-    def __new__(cls, *args):
+    def __new__(cls, *args: Any):
         def _label(s):
             if s is None or s == "":
                 return None
@@ -82,7 +85,7 @@ class Lquery(tuple):
             else:
                 return _label(str(s))
 
-        labels = []
+        labels: list[str] = []
 
         for arg in args:
             if isinstance(arg, str):
@@ -95,8 +98,8 @@ class Lquery(tuple):
         return tuple.__new__(cls, cls._merge_labels(labels))
 
     @classmethod
-    def _merge_labels(cls, labels):
-        rv = []
+    def _merge_labels(cls, labels: list[str]) -> list[str]:
+        rv: list[str] = []
         for label in labels:
             if label is None:
                 continue
@@ -110,7 +113,7 @@ class Lquery(tuple):
 
         return rv
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, Lquery):
             return tuple.__eq__(self, other)
         elif isinstance(other, str):
@@ -118,27 +121,23 @@ class Lquery(tuple):
         else:
             return self.__eq__(Lquery(other))
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self)
 
-    def __add__(self, other):
+    def __add__(self, other: Any) -> Lquery:
         return Lquery(self, other)
 
-    def __radd__(self, other):
+    def __radd__(self, other: Any) -> Lquery:
         return Lquery(other, self)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "%s(%r)" % (
             self.__class__.__name__,
             ".".join(str(i) for i in self),
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(".".join(str(i) for i in self))
-
-    def __getslice__(self, i, j):
-        """Python 2 compatibility function."""
-        return self.__getitem__(slice(i, j))
 
     def __getitem__(self, i):
         if not isinstance(i, slice):

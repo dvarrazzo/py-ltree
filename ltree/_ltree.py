@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import re
 from functools import total_ordering
 from collections.abc import Sequence
+
+from typing import Any
 
 re_ltree = re.compile(r"^[a-zA-Z0-9_]+$")
 
@@ -35,7 +39,7 @@ class Ltree(tuple):
 
         return tuple.__new__(cls, (label for label in labels if label is not None))
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, Ltree):
             return tuple.__eq__(self, other)
         elif isinstance(other, str):
@@ -43,7 +47,7 @@ class Ltree(tuple):
         else:
             return self.__eq__(Ltree(other))
 
-    def __lt__(self, other):
+    def __lt__(self, other: Any) -> bool:
         if isinstance(other, Ltree):
             return tuple.__lt__(self, other)
         elif isinstance(other, str):
@@ -51,22 +55,22 @@ class Ltree(tuple):
         else:
             return self.__lt__(Ltree(other))
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self)
 
-    def __add__(self, other):
+    def __add__(self, other: Any) -> Ltree:
         return Ltree(self, other)
 
-    def __radd__(self, other):
+    def __radd__(self, other) -> Ltree:
         return Ltree(other, self)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "%s(%r)" % (
             self.__class__.__name__,
             ".".join(str(i) for i in self),
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(".".join(str(i) for i in self))
 
     def __getslice__(self, i, j):
@@ -78,10 +82,3 @@ class Ltree(tuple):
             return tuple.__getitem__(self, i)
         else:
             return Ltree(tuple.__getitem__(self, i))
-
-    # this *doesn't* work, because I'm an asshole: see psycopg bug #456
-    # Now I have to write an adapter, register an adapter... sigh.
-    # def __conform__(self, proto):
-    #     import psycopg2.extensions as ext
-    #     if issubclass(proto, ext.ISQLQuote):
-    #         return ext.AsIs("'%s'" % self)
