@@ -1,116 +1,73 @@
-import sys
+from __future__ import annotations
 
-import psycopg2
-import psycopg2.extensions as ext
+from functools import cache
 
-from ltree import Lquery, Ltree
+from psycopg import AsyncConnection, postgres
+from psycopg.types import TypeInfo
+from psycopg.abc import AdaptContext, Buffer
+from psycopg.adapt import Dumper, Loader
+
+from ltree import Ltree
 
 
-def register_adapter():
-    """Retigster the ltree adapters globally.
+class BaseLtreeDumper(Dumper):
+    def dump(self, ltree: Ltree) -> bytes:
+        return str(ltree).encode()
+
+
+class LtreeLoader(Loader):
+    def load(self, buf: Buffer) -> Ltree:
+        return Ltree(bytes(buf).decode())
+
+
+async def fetch_type(conn: AsyncConnection) -> TypeInfo | None:
+    return await TypeInfo.fetch(conn, "ltree")
+
+
+def register_ltree(info: TypeInfo, context: AdaptContext | None = None) -> None:
+    """Register the adapters to load and dump ltree.
+
+    :param info: The object with the information about the ltree type.
+    :param context: The context where to register the adapters. If `!None`,
+        register it globally.
+
+    .. note::
+
+        Registering the adapters doesn't affect objects already created, even
+        if they are children of the registered context. For instance,
+        registering the adapter globally doesn't affect already existing
+        connections.
     """
-    ext.register_adapter(Ltree, adapt_ltree)
-    ext.register_adapter(Lquery, adapt_ltree)
+    # A friendly error warning instead of an AttributeError in case fetch()
+    # failed and it wasn't noticed.
+    if not info:
+        raise TypeError("no info passed. Is the 'ltree' extension loaded?")
+
+    # Register arrays and type info
+    info.register(context)
+
+    adapters = context.adapters if context else postgres.adapters
+
+    # Generate and register a customized text dumper
+    adapters.register_dumper(Ltree, _make_ltree_dumper(info.oid))
+
+    # register the text loader on the oid
+    adapters.register_loader(info.oid, LtreeLoader)
 
 
-def register_ltree(conn_or_curs, globally=False, oid=None, array_oid=None):
-    """Register the ltree adapter and typecaster on the connection or cursor.
+# Cache all dynamically-generated types to avoid leaks in case the types
+# cannot be GC'd.
+
+
+@cache
+def _make_ltree_dumper(oid_in: int) -> type[BaseLtreeDumper]:
     """
-    register_adapter()
+    Return an hstore dumper class configured using `oid_in`.
 
-    conn, curs, conn_or_curs = _solve_conn_curs(conn_or_curs)
-
-    if oid is None:
-        oid = get_oids(conn_or_curs, 'ltree')
-        if oid is None or not oid[0]:
-            raise psycopg2.ProgrammingError(
-                "ltree type not found in the database."
-            )
-        else:
-            array_oid = oid[1]
-            oid = oid[0]
-
-    if isinstance(oid, int):
-        oid = (oid,)
-
-    if array_oid is not None:
-        if isinstance(array_oid, int):
-            array_oid = (array_oid,)
-        else:
-            array_oid = tuple([x for x in array_oid if x])
-
-    # create and register the typecaster
-    LTREE = ext.new_type(oid, "LTREE", cast_ltree)
-    ext.register_type(LTREE, not globally and conn_or_curs or None)
-
-    if array_oid:
-        LTREEARRAY = ext.new_array_type(array_oid, "LTREEARRAY", LTREE)
-        ext.register_type(LTREEARRAY, not globally and conn_or_curs or None)
-
-
-def adapt_ltree(x):
-    """Convert an ltree into an object implementing the ISQLQuote protocol
+    Avoid to create new classes if the oid configured is the same.
     """
-    return ext.QuotedString(str(x))
 
+    class LtreeDumper(BaseLtreeDumper):
+        oid = oid_in
 
-def cast_ltree(s, cur):
-    """Convert an ltree string representation into an ``Ltree`` object.
-    """
-    if s is not None:
-        return Ltree(s)
-
-
-def get_oids(conn_or_curs, type_name):
-    """Return the lists of OID of a type with given name.
-    """
-    conn, curs, conn_or_curs = _solve_conn_curs(conn_or_curs)
-
-    # Store the transaction status of the connection to revert it after use
-    conn_status = conn.status
-
-    rv0, rv1 = [], []
-
-    # get the oid for the ltree
-    curs.execute(
-        """\
-        select t.oid, typarray
-        from pg_type t join pg_namespace ns
-            on typnamespace = ns.oid
-        where typname = %s
-        """,
-        (type_name,),
-    )
-
-    for oids in curs:
-        rv0.append(oids[0])
-        rv1.append(oids[1])
-
-    # revert the status of the connection as before the command
-    if conn_status != ext.STATUS_IN_TRANSACTION and not conn.autocommit:
-        conn.rollback()
-
-    return tuple(rv0), tuple(rv1)
-
-
-def _solve_conn_curs(conn_or_curs):
-    """Return the connection and a DBAPI cursor from a connection or cursor.
-    """
-    if conn_or_curs is None:
-        raise psycopg2.ProgrammingError("no connection or cursor provided")
-
-    if hasattr(conn_or_curs, 'execute'):
-        conn = conn_or_curs.connection
-        curs = conn.cursor(cursor_factory=ext.cursor)
-
-        # Django wrapper
-        mod = sys.modules.get('django.db.backends.utils')
-        if mod is not None:
-            if isinstance(conn_or_curs, mod.CursorWrapper):
-                conn_or_curs = conn_or_curs.cursor
-    else:
-        conn = conn_or_curs
-        curs = conn.cursor(cursor_factory=ext.cursor)
-        conn_or_curs = curs.connection
-
-    return conn, curs, conn_or_curs
+    return LtreeDumper

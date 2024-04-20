@@ -1,12 +1,11 @@
 import re
-from collections import Sequence, namedtuple
+from collections import namedtuple
+from collections.abc import Sequence
 
-import six
-
-re_lquery = re.compile(r'^[a-zA-Z0-9_\|]+$')
+re_lquery = re.compile(r"^[a-zA-Z0-9_\|]+$")
 
 
-class Star(namedtuple('Star', 'min max')):
+class Star(namedtuple("Star", "min max")):
     def __new__(cls, min=None, max=None):
         min = None if not min else int(min)
         max = None if not max else int(max)
@@ -14,12 +13,12 @@ class Star(namedtuple('Star', 'min max')):
         return self
 
     re_star = re.compile(
-        r'''
+        r"""
         ^ (?:
               (\*)
             | (?: \* \{ (\d+) \} )
             | (?: \* \{ (\d*) , (\d*) \} )
-        ) $''',
+        ) $""",
         re.VERBOSE,
     )
 
@@ -43,27 +42,23 @@ class Star(namedtuple('Star', 'min max')):
 
     def merge(self, other):
         min = ((self.min or 0) + (other.min or 0)) or None
-        max = (
-            None
-            if (self.max is None or other.max is None)
-            else self.max + other.max
-        )
+        max = None if (self.max is None or other.max is None) else self.max + other.max
         return Star(min, max)
 
     def __str__(self):
         if self.min is None and self.max is None:
-            return '*'
+            return "*"
         if self.min is not None and self.max is not None:
             if self.min == self.max:
-                return '*{%d}' % (self.min,)
+                return "*{%d}" % (self.min,)
             else:
-                return '*{%d,%d}' % (self.min, self.max)
+                return "*{%d,%d}" % (self.min, self.max)
         if self.min is not None:
-            return '*{%d,}' % (self.min,)
+            return "*{%d,}" % (self.min,)
         if self.max is not None:
-            return '*{,%d}' % (self.max,)
+            return "*{,%d}" % (self.max,)
 
-        assert False, 'wat?'
+        assert False, "wat?"
 
 
 class Lquery(tuple):
@@ -73,9 +68,9 @@ class Lquery(tuple):
 
     def __new__(cls, *args):
         def _label(s):
-            if s is None or s == '':
+            if s is None or s == "":
                 return None
-            if isinstance(s, six.string_types):
+            if isinstance(s, str):
                 if re_lquery.match(s):
                     return s
 
@@ -83,15 +78,15 @@ class Lquery(tuple):
                 if star is not None:
                     return star
 
-                raise ValueError('lquery label not valid: %s' % s)
+                raise ValueError("lquery label not valid: %s" % s)
             else:
                 return _label(str(s))
 
         labels = []
 
         for arg in args:
-            if isinstance(arg, six.string_types):
-                labels.extend(_label(i) for i in arg.split('.'))
+            if isinstance(arg, str):
+                labels.extend(_label(i) for i in arg.split("."))
             elif isinstance(arg, Sequence):
                 labels.extend(_label(i) for i in arg)
             else:
@@ -102,23 +97,23 @@ class Lquery(tuple):
     @classmethod
     def _merge_labels(cls, labels):
         rv = []
-        for l in labels:
-            if l is None:
+        for label in labels:
+            if label is None:
                 continue
             if not rv:
-                rv.append(l)
+                rv.append(label)
                 continue
-            if isinstance(rv[-1], Star) and isinstance(l, Star):
-                rv[-1] = rv[-1].merge(l)
+            if isinstance(rv[-1], Star) and isinstance(label, Star):
+                rv[-1] = rv[-1].merge(label)
             else:
-                rv.append(l)
+                rv.append(label)
 
         return rv
 
     def __eq__(self, other):
         if isinstance(other, Lquery):
             return tuple.__eq__(self, other)
-        elif isinstance(other, six.string_types):
+        elif isinstance(other, str):
             return str(self) == other
         else:
             return self.__eq__(Lquery(other))
@@ -133,13 +128,13 @@ class Lquery(tuple):
         return Lquery(other, self)
 
     def __repr__(self):
-        return '%s(%r)' % (
+        return "%s(%r)" % (
             self.__class__.__name__,
-            '.'.join(str(i) for i in self),
+            ".".join(str(i) for i in self),
         )
 
     def __str__(self):
-        return str('.'.join(str(i) for i in self))
+        return str(".".join(str(i) for i in self))
 
     def __getslice__(self, i, j):
         """Python 2 compatibility function."""

@@ -1,10 +1,8 @@
 import re
 from functools import total_ordering
-from collections import Sequence
+from collections.abc import Sequence
 
-import six
-
-re_ltree = re.compile(r'^[a-zA-Z0-9_]+$')
+re_ltree = re.compile(r"^[a-zA-Z0-9_]+$")
 
 
 @total_ordering
@@ -15,32 +13,32 @@ class Ltree(tuple):
 
     def __new__(cls, *args):
         def _label(s):
-            if s is None or s == '':
+            if s is None or s == "":
                 return None
-            if isinstance(s, six.string_types):
+            if isinstance(s, str):
                 if re_ltree.match(s):
                     return s
                 else:
-                    raise ValueError('ltree label not valid: %s' % s)
+                    raise ValueError("ltree label not valid: %s" % s)
             else:
                 return _label(str(s))
 
         labels = []
 
         for arg in args:
-            if isinstance(arg, six.string_types):
-                labels.extend(_label(i) for i in arg.split('.'))
+            if isinstance(arg, str):
+                labels.extend(_label(i) for i in arg.split("."))
             elif isinstance(arg, Sequence):
                 labels.extend(_label(i) for i in arg)
             else:
                 labels.append(_label(arg))
 
-        return tuple.__new__(cls, (l for l in labels if l is not None))
+        return tuple.__new__(cls, (label for label in labels if label is not None))
 
     def __eq__(self, other):
         if isinstance(other, Ltree):
             return tuple.__eq__(self, other)
-        elif isinstance(other, six.string_types):
+        elif isinstance(other, str):
             return str(self) == other
         else:
             return self.__eq__(Ltree(other))
@@ -48,7 +46,7 @@ class Ltree(tuple):
     def __lt__(self, other):
         if isinstance(other, Ltree):
             return tuple.__lt__(self, other)
-        elif isinstance(other, six.string_types):
+        elif isinstance(other, str):
             return str(self) < other
         else:
             return self.__lt__(Ltree(other))
@@ -63,13 +61,13 @@ class Ltree(tuple):
         return Ltree(other, self)
 
     def __repr__(self):
-        return '%s(%r)' % (
+        return "%s(%r)" % (
             self.__class__.__name__,
-            '.'.join(str(i) for i in self),
+            ".".join(str(i) for i in self),
         )
 
     def __str__(self):
-        return str('.'.join(str(i) for i in self))
+        return str(".".join(str(i) for i in self))
 
     def __getslice__(self, i, j):
         """Python 2 compatibility function."""
