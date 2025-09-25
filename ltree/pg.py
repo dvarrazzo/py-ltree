@@ -3,10 +3,12 @@ from __future__ import annotations
 from typing import Any
 from functools import cache
 
+import psycopg.errors as e
 from psycopg import AsyncConnection, postgres
-from psycopg.types import TypeInfo
+from psycopg.pq import Format
 from psycopg.abc import AdaptContext, Buffer
 from psycopg.adapt import Dumper, Loader
+from psycopg.types import TypeInfo
 
 from ltree import Ltree, Lquery
 
@@ -16,11 +18,31 @@ class BaseLtreeDumper(Dumper):
         return str(obj).encode()
 
 
+class BaseLtreeBinaryDumper(BaseLtreeDumper):
+    format: Format = Format.BINARY
+
+    def dump(self, obj: Ltree | Lquery) -> bytes:
+        return b"\01" + super().dump(obj)
+
+
 class BaseLtreeLoader(Loader):
     cls: type[Ltree] | type[Lquery]
 
     def load(self, buf: Buffer) -> Ltree | Lquery:
         return self.cls(bytes(buf).decode())
+
+
+class BaseLtreeBinaryLoader(BaseLtreeLoader):
+    format: Format = Format.BINARY
+
+    def load(self, buf: Buffer) -> Ltree | Lquery:
+        if not buf:
+            raise e.DataError(f"empty buffer in {type(self).__name__}")
+
+        if buf[0] != 1:
+            raise e.NotSupportedError(f"unknown Ltree/Lquery version: {buf[0]}")
+
+        return super().load(buf[1:])
 
 
 async def fetch_ltree_types(
@@ -59,13 +81,13 @@ def register_ltree(
 
     adapters = context.adapters if context else postgres.adapters
 
-    # Generate and register a customized text dumper
-    adapters.register_dumper(Ltree, _make_dumper(ltree_info.oid))
-    adapters.register_dumper(Lquery, _make_dumper(lquery_info.oid))
+    for oid, typ in [(ltree_info.oid, Ltree), (lquery_info.oid, Lquery)]:
+        base: type
+        for base in BaseLtreeDumper, BaseLtreeBinaryDumper:
+            adapters.register_dumper(typ, _make_dumper(oid, base))
 
-    # register the text loader on the oid
-    adapters.register_loader(ltree_info.oid, _make_loader(Ltree))
-    adapters.register_loader(lquery_info.oid, _make_loader(Lquery))
+        for base in BaseLtreeLoader, BaseLtreeBinaryLoader:
+            adapters.register_loader(oid, _make_loader(typ, base))
 
 
 # Cache all dynamically-generated types to avoid leaks in case the types
@@ -73,28 +95,20 @@ def register_ltree(
 
 
 @cache
-def _make_dumper(oid_in: int) -> type[BaseLtreeDumper]:
+def _make_dumper(oid_in: int, base: type[BaseLtreeDumper]) -> type[BaseLtreeDumper]:
     """
     Return a ltree/lquery dumper class configured using `oid_in`.
 
     Avoid to create new classes if the oid configured is the same.
     """
-
-    class LtreeDumper(BaseLtreeDumper):
-        oid = oid_in
-
-    return LtreeDumper
+    return type(base.__name__.replace("Base", ""), (base,), {"oid": oid_in})
 
 
 @cache
-def _make_loader(cls_in: type) -> type[BaseLtreeLoader]:
+def _make_loader(cls_in: type, base: type[BaseLtreeLoader]) -> type[BaseLtreeLoader]:
     """
     Return a ltree/lquery loader class configured using `type_in`.
 
     Avoid to create new classes if the oid configured is the same.
     """
-
-    class LtreeLoader(BaseLtreeLoader):
-        cls = cls_in
-
-    return LtreeLoader
+    return type(base.__name__.replace("Base", ""), (base,), {"cls": cls_in})
