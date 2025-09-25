@@ -5,7 +5,7 @@ from django.db.models.fields import Field
 
 
 @Field.register_lookup
-class LqueryMatch(Lookup):
+class LqueryMatch(Lookup):  # type: ignore[misc]
     lookup_name = "lqmatch"
 
     def as_postgresql(self, compiler, connection):

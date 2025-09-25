@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ls.ltree"
+version = "0.2.0"
+description = "Python wrapper for the PostgreSQL ltree data type"
+authors = [{name = "Daniele Varrazzo", email = "daniele.varrazzo@gmail.com"}]
+requires-python = ">= 3.10"
+dependencies = [
+    "psycopg >= 3",
+    "typing_extensions",
+]
+
+[project.readme]
+file = "README.rst"
+content-type = "text/x-rst"
+
+[project.urls]
+Homepage = "https://github.com/dvarrazzo/py-ltree"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-randomly",
+]
+dev = [
+    "black",
+    "flake8",
+    "mypy",
+]
+
+[tool.setuptools]
+zip-safe = false
+
+[tool.setuptools.packages.find]
+exclude = ["tests"]
+namespaces = false
+
+[tool.setuptools.package-data]
+ltree = [
+    "py.typed",
+]

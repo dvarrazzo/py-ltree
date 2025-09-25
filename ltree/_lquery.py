@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from uuid import UUID
+from typing import Any, TypeAlias
 from collections import namedtuple
 from collections.abc import Sequence
 
+from typing_extensions import Self
+
 re_lquery = re.compile(r"^[a-zA-Z0-9_\|]+$")
+
+LqueryItem: TypeAlias = "str | Star | Lquery"
 
 
 class Star(namedtuple("Star", "min max")):
-    def __new__(cls, min: int | None = None, max: int | None = None):
+    def __new__(cls, min: int | None = None, max: int | None = None) -> Self:
         min = None if not min else int(min)
         max = None if not max else int(max)
         self = super(Star, cls).__new__(cls, min, max)
@@ -26,7 +31,7 @@ class Star(namedtuple("Star", "min max")):
     )
 
     @classmethod
-    def parse(cls, s: str) -> Star | None:
+    def parse(cls, s: str) -> Self | None:
         m = cls.re_star.match(s)
         if m is None:
             return None
@@ -64,13 +69,13 @@ class Star(namedtuple("Star", "min max")):
         assert False, "wat?"
 
 
-class Lquery(tuple):
+class Lquery(tuple[LqueryItem]):
     """Wrapper for the Lquery data type."""
 
     __slots__ = ()
 
-    def __new__(cls, *args: Any):
-        def _label(s):
+    def __new__(cls, *args: str | UUID | Star | Lquery | None) -> Self:
+        def _label(s: Any) -> LqueryItem | None:
             if s is None or s == "":
                 return None
             if isinstance(s, str):
@@ -82,10 +87,12 @@ class Lquery(tuple):
                     return star
 
                 raise ValueError("lquery label not valid: %s" % s)
+            elif isinstance(s, UUID):
+                return _label(str(s).lower().replace("-", "_"))
             else:
                 return _label(str(s))
 
-        labels: list[str] = []
+        labels: list[LqueryItem | None] = []
 
         for arg in args:
             if isinstance(arg, str):
@@ -95,11 +102,11 @@ class Lquery(tuple):
             else:
                 labels.append(_label(arg))
 
-        return tuple.__new__(cls, cls._merge_labels(labels))
+        return tuple.__new__(cls, cls._merge_labels(labels))  # type: ignore[type-var]
 
     @classmethod
-    def _merge_labels(cls, labels: list[str]) -> list[str]:
-        rv: list[str] = []
+    def _merge_labels(cls, labels: list[LqueryItem | None]) -> list[LqueryItem]:
+        rv: list[LqueryItem] = []
         for label in labels:
             if label is None:
                 continue
@@ -139,8 +146,8 @@ class Lquery(tuple):
     def __str__(self) -> str:
         return str(".".join(str(i) for i in self))
 
-    def __getitem__(self, i):
+    def __getitem__(self, i) -> LqueryItem:  # type: ignore
         if not isinstance(i, slice):
-            return tuple.__getitem__(self, i)
+            return tuple.__getitem__(self, i)  # type: ignore
         else:
-            return Lquery(tuple.__getitem__(self, i))
+            return Lquery(tuple.__getitem__(self, i))  # type: ignore[arg-type]

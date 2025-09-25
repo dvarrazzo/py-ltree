@@ -1,22 +1,26 @@
 from __future__ import annotations
 
 import re
+from uuid import UUID
+from typing import Any, TypeAlias
 from functools import total_ordering
 from collections.abc import Sequence
 
-from typing import Any
+from typing_extensions import Self
 
+LtreeItem: TypeAlias = str
 re_ltree = re.compile(r"^[a-zA-Z0-9_]+$")
 
 
 @total_ordering
-class Ltree(tuple):
+class Ltree(tuple[str]):
     """Wrapper for the Ltree data type."""
 
     __slots__ = ()
+    __module__ = "ltree"
 
-    def __new__(cls, *args):
-        def _label(s):
+    def __new__(cls, *args: Any) -> Self:
+        def _label(s: LtreeItem | None | UUID) -> LtreeItem | None:
             if s is None or s == "":
                 return None
             if isinstance(s, str):
@@ -24,10 +28,12 @@ class Ltree(tuple):
                     return s
                 else:
                     raise ValueError("ltree label not valid: %s" % s)
+            elif isinstance(s, UUID):
+                return _label(str(s).lower().replace("-", "_"))
             else:
                 return _label(str(s))
 
-        labels = []
+        labels: list[LtreeItem | None] = []
 
         for arg in args:
             if isinstance(arg, str):
@@ -37,7 +43,9 @@ class Ltree(tuple):
             else:
                 labels.append(_label(arg))
 
-        return tuple.__new__(cls, (label for label in labels if label is not None))
+        return tuple.__new__(  # type: ignore[type-var]
+            cls, (label for label in labels if label is not None)
+        )
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, Ltree):
@@ -61,7 +69,7 @@ class Ltree(tuple):
     def __add__(self, other: Any) -> Ltree:
         return Ltree(self, other)
 
-    def __radd__(self, other) -> Ltree:
+    def __radd__(self, other: Any) -> Ltree:
         return Ltree(other, self)
 
     def __repr__(self) -> str:
@@ -73,12 +81,8 @@ class Ltree(tuple):
     def __str__(self) -> str:
         return str(".".join(str(i) for i in self))
 
-    def __getslice__(self, i, j):
-        """Python 2 compatibility function."""
-        return self.__getitem__(slice(i, j))
-
-    def __getitem__(self, i):
+    def __getitem__(self, i) -> LtreeItem:  # type: ignore
         if not isinstance(i, slice):
-            return tuple.__getitem__(self, i)
+            return tuple.__getitem__(self, i)  # type: ignore
         else:
-            return Ltree(tuple.__getitem__(self, i))
+            return Ltree(tuple.__getitem__(self, i))  # type: ignore[return-value]

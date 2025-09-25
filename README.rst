@@ -77,32 +77,35 @@ always does the right thing with two stars in a row)::
     Lquery('a.*{1,}.b')
 
 
-Using with psycopg2
--------------------
+Using with Psycopg 3
+--------------------
 
-In order to pass ``Ltree`` and ``Lquery`` objects to psycopg2 you can register
-the ltree adapters using the ``ltree.pg.register_ltree()`` function. Because
-the ``ltree`` type doesn't have a fixed OID, the function takes a connection
-or cursor as argument to look it up::
+In order to pass ``Ltree`` and ``Lquery`` objects to Psycopg you need to find
+the OIDs of the types in the database::
 
-    >>> import psycopg2
-    >>> cnn = psycopg2.connect('')
+    import psycopg
+    from psycopg.types import TypeInfo
 
-    >>> import ltree.pg
-    >>> ltree.pg.register_ltree(cnn)
+    conn = psycopg.connect(...)
+
+    ltree_type = TypeInfo.fetch(conn, "ltree")
+    lquery_type = TypeInfo.fetch(conn, "lquery")
+
+Once you have this information you can use the ``register_ltree()`` function
+to register the ltree adapters in a context, for example the same connection::
+
+    from ltree import Ltree, Lquery
+    from ltree.pg import register_ltree
+
+    register_ltree(ltree_type, lquery_type, conn)
 
 Once the adaptation bits are in place shuttling ``Ltree`` back and forth the
 database is a breeze::
 
-    >>> cur = cnn.cursor()
-    >>> cur.execute('select %s::ltree', [Ltree('a.b.c')])
-    >>> cur.fetchone()[0]
+    >>> conn.execute('select %s', [Ltree('a.b.c')]).fetchone()[0]
     Ltree('a.b.c')
 
-    >>> cur.execute(
-    ...     "select %s::ltree ~ %s::lquery",
-    ...     [Ltree('a.b.c'), Lquery('a.*')])
-    >>> cur.fetchone()[0]
+    >>> conn.execute("select %s ~ %s", [Ltree("a.b.c"), Lquery("a.*")]).fetchone()[0]
     True
 
 

@@ -1,5 +1,5 @@
 /.cache
-/build
+build
 /dist
 /ltree.egg-info
 *.pyc
